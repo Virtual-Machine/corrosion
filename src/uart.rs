@@ -1,4 +1,4 @@
-use crate::config::{BANNER, DEBUG, INFO, MAIN, STEP, TEST, TEST_PASSED, VERSION, PLATFORM};
+use crate::config::{BANNER, DEBUG, INFO, MAIN, PLATFORM, STEP, TEST, TEST_PASSED, VERSION};
 use crate::print;
 use crate::println;
 use core::fmt::{Error, Write};

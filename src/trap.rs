@@ -1,4 +1,4 @@
-use crate::config::{TRAP_COLOUR, RESET_COLOUR};
+use crate::config::{RESET_COLOUR, TRAP_COLOUR};
 use crate::plic;
 use crate::print;
 use crate::println;
