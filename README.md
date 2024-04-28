@@ -1,5 +1,7 @@
 # Corrosion
 
+[https://img.shields.io/badge/version-0.2.0-blue]
+
 ## CorrOSion is an OS
 
 -   Language: Rust
@@ -15,10 +17,10 @@ For transparency, corrOSion is heavily inspired by Stephen Marz' osblog. Wheneve
 
 ## Roadmap
 
--   0.1.0 _done_ UART, PLIC, Traps, VirtIO Block Driver, Kernel Page and Byte Allocator
--   0.2.0 _current_ FileSystem
--   0.3.0 _next_ Graphics, Keyboard Input
--   0.?.0 _unknown_ Networking, Mouse Input, APLIC, SMP
+-   0.1.0 [x] UART, PLIC, Traps, VirtIO Block Driver, Kernel Page and Byte Allocator
+-   0.2.0 [ ] FileSystem
+-   0.3.0 [ ] Graphics, Keyboard Input
+-   0.?.0 [ ] Networking, Mouse Input, APLIC, SMP
 
 ## Getting Started
 
