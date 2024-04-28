@@ -20,7 +20,7 @@ For transparency, corrOSion is heavily inspired by Stephen Marz' osblog. Wheneve
 ## Roadmap
 
 -   0.1.0 [x] UART, PLIC, Traps, VirtIO Block Driver, Kernel Page and Byte Allocator
--   0.2.0 [ ] FileSystem
+-   0.2.0 [-] FileSystem
 -   0.3.0 [ ] Graphics, Keyboard Input
 -   0.?.0 [ ] Networking, Mouse Input, APLIC, SMP
 
