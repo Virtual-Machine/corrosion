@@ -1,16 +1,13 @@
 # Corrosion
 
-## CorrOSion is an OS
-
 ![version](https://img.shields.io/badge/version-0.2.0-blue)
 
-![language](https://img.shields.io/badge/language-rust-orange)
+## CorrOSion is an OS
 
-![arch](https://img.shields.io/badge/arch-riscv-green)
-
-![bits](https://img.shields.io/badge/bits-64-purple)
-
-![target](https://img.shields.io/badge/target-qemu_virt-red)
+-   Language: Rust
+-   CPU Arch: Risc-V
+-   Bits: 64
+-   Machine: Qemu Virt
 
 Please note that this is a toy and not planned for serious use. Regardless, this should be a fun learning/experimentation resource for those interested.
 
