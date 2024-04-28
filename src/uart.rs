@@ -1,6 +1,5 @@
 use crate::config::{BANNER, DEBUG, INFO, MAIN, PLATFORM, STEP, TEST, TEST_PASSED, VERSION};
-use crate::print;
-use crate::println;
+use crate::{print, println};
 use core::fmt::{Error, Write};
 
 // mod uart.rs
@@ -11,6 +10,7 @@ static mut UART: Uart = Uart {
     base_address: 0x1000_0000,
 };
 
+#[derive(Clone, Copy)]
 pub struct Uart {
     base_address: usize,
 }
@@ -61,8 +61,8 @@ pub fn init() {
     unsafe { UART.init() }
 }
 
-pub fn get_uart() -> &'static mut Uart {
-    unsafe { &mut UART }
+pub fn get_uart() -> Uart {
+    unsafe { UART }
 }
 
 pub fn serial_info(txt: &str) {
@@ -83,6 +83,14 @@ pub fn serial_test(txt: &str) {
 
 pub fn serial_debug(txt: &str) {
     println!("\n  {} {}", DEBUG, txt);
+}
+
+pub fn serial_debug_text(label: &str, txt: &str) {
+    println!("\n  {} {}:{}", DEBUG, label, txt);
+}
+
+pub fn serial_debug_number(label: &str, num: usize) {
+    println!("\n  {} {}:{}", DEBUG, label, num);
 }
 
 pub fn serial_test_passed() {

@@ -1,9 +1,8 @@
 use crate::alloc::{alloc_bytes, alloc_pages_zeroed, free_bytes};
-use crate::config::PAGE_SIZE;
-use crate::print;
-use crate::println;
+use crate::assembly;
+use crate::config::{PAGE_SIZE, WAIT_FOR_READY};
 use crate::uart::serial_info;
-
+use crate::{print, println};
 use core::mem::size_of;
 
 // mod block.rs
@@ -110,6 +109,7 @@ pub struct BlockDevice {
     idx: u16,
     ack_used_idx: u16,
     read_only: bool,
+    ready: [bool; VIRTIO_RING_SIZE],
 }
 
 impl BlockDevice {
@@ -174,6 +174,7 @@ impl BlockDevice {
             idx: 0,
             ack_used_idx: 0,
             read_only: ro,
+            ready: [true; VIRTIO_RING_SIZE],
         };
         BLOCK_DEVICE = Some(bd);
     }
@@ -208,9 +209,10 @@ impl BlockDevice {
     unsafe fn use_queue(&mut self) {
         let queue = &(*self.queue);
         while self.ack_used_idx != queue.used.idx {
-            let elem = &queue.used.ring[self.ack_used_idx as usize % VIRTIO_RING_SIZE];
+            let idx = self.ack_used_idx as usize % VIRTIO_RING_SIZE;
+            let elem = &queue.used.ring[idx];
             self.ack_used_idx = self.ack_used_idx.wrapping_add(1);
-
+            self.ready[idx] = true;
             let rq = queue.desc[elem.id as usize].addr as *const Request;
             free_bytes(rq as *mut u8);
         }
@@ -264,10 +266,13 @@ impl BlockDevice {
         let _status_idx = self.fill_next_descriptor(desc);
     }
 
-    unsafe fn block_notify(&mut self, head_idx: u16) {
-        (*self.queue).avail.ring[(*self.queue).avail.idx as usize % VIRTIO_RING_SIZE] = head_idx;
+    unsafe fn block_notify(&mut self, head_idx: u16) -> usize {
+        let idx = (*self.queue).avail.idx as usize % VIRTIO_RING_SIZE;
+        (*self.queue).avail.ring[idx] = head_idx;
         (*self.queue).avail.idx = (*self.queue).avail.idx.wrapping_add(1);
+        self.ready[idx] = false;
         self.dev.add(MMIO_QUEUE_NOTIFY).write_volatile(0);
+        idx
     }
 
     unsafe fn block_operation(&mut self, buffer: *mut u8, size: u32, offset: u64, write: bool) {
@@ -278,7 +283,12 @@ impl BlockDevice {
         let (blk_request, head_idx) = self.block_header(buffer, offset, write);
         self.block_data(buffer, size, write);
         self.block_status(blk_request);
-        self.block_notify(head_idx);
+        let idx = self.block_notify(head_idx);
+        let mut counter = 0;
+        while counter < WAIT_FOR_READY && !self.ready[idx] {
+            assembly::no_operation();
+            counter += 1;
+        }
     }
 
     unsafe fn fill_next_descriptor(&mut self, desc: Descriptor) -> u16 {

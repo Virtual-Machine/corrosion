@@ -6,3 +6,6 @@ run-test:
 
 run-debug:
 	cargo run --features "debug-full test-suite"
+
+run-all:
+	cargo run --features "debug-full test-suite test-block-write"

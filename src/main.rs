@@ -7,18 +7,24 @@
 #![feature(panic_info_message, alloc_error_handler, lang_items)]
 
 // Project Rust Modules
-pub mod alloc;
-pub mod assembly;
-pub mod block;
-pub mod config;
-pub mod plic;
-pub mod test;
-pub mod trap;
-pub mod uart;
-pub mod virtio;
+mod alloc;
+mod assembly;
+mod block;
+mod buffer;
+mod config;
+mod debug;
+mod memory;
+mod minixfs3;
+mod plic;
+#[allow(unused_imports)]
+mod test;
+mod trap;
+mod uart;
+mod virtio;
 
 use crate::uart::serial_step;
-use core::arch::asm;
+
+extern crate alloc as rust_alloc;
 
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
@@ -63,9 +69,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 extern "C" fn abort() -> ! {
     loop {
-        unsafe {
-            asm!("wfi");
-        }
+        assembly::wait_for_interrupt();
     }
 }
 
@@ -76,6 +80,9 @@ extern "C" fn kernel_init() {
     alloc::init(); // Kernel Memory Allocator
     plic::init(); // Platform level interrupt controller
     virtio::init(); // Virtio driver
+    minixfs3::init(); // Initialize fs cache
+    #[cfg(feature = "debug-full")]
+    debug::fs_cache();
 }
 
 #[no_mangle]

@@ -1,7 +1,6 @@
 use crate::block;
-use crate::print;
-use crate::println;
 use crate::uart::serial_info;
+use crate::{print, println};
 
 // mod virtio.rs
 // A simple driver for interacting with legacy MMIO devices in QEMU

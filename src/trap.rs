@@ -1,7 +1,6 @@
 use crate::config::{RESET_COLOUR, TRAP_COLOUR};
 use crate::plic;
-use crate::print;
-use crate::println;
+use crate::{print, println};
 
 // mod trap.rs
 // Rust handler switch for CPU traps

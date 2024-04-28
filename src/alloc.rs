@@ -1,8 +1,8 @@
 use crate::config::PAGE_SIZE;
-use crate::print;
-use crate::println;
-use crate::uart::serial_debug;
+use crate::debug;
+use crate::memory::align_val;
 use crate::uart::serial_info;
+use crate::{print, println};
 use core::{mem::size_of, ptr::null_mut};
 
 // mod alloc.rs
@@ -21,12 +21,6 @@ const ALLOC_TAKEN: usize = 1 << 63;
 const PAGE_FLAG_EMPTY: u8 = 0;
 const PAGE_FLAG_TAKEN: u8 = 1;
 const PAGE_FLAG_LAST: u8 = 2;
-
-// Helper to align a value
-const fn align_val(val: usize, order: usize) -> usize {
-    let o = (1usize << order) - 1;
-    (val + o) & !o
-}
 
 // This is the PageGrainAllocator state
 static mut PAGE_GRAIN_ALLOC: PageGrainAllocator = PageGrainAllocator {};
@@ -50,7 +44,7 @@ impl PageGrainAllocator {
         unsafe {
             let num_pages = HEAP_SIZE / PAGE_SIZE;
             let ptr = HEAP_START as *mut PageGrainFlags;
-            for i in 0..num_pages - pages {
+            for i in 0..=num_pages - pages {
                 let mut found = false;
                 if (*ptr.add(i)).is_free() {
                     found = true;
@@ -95,7 +89,7 @@ impl PageGrainAllocator {
             let alloc_beg = BYTE_GRAIN_ALLOC.get_start();
             let alloc_end = MEMORY_END;
             let avail_pages = (alloc_end - alloc_beg) / 4096;
-            serial_debug(
+            debug::dbg(
                 "Kernel Allocator Memory Map\n\nRANGE:       START         END           PAGES",
             );
             println!(
@@ -261,6 +255,7 @@ impl ByteGrainAllocator {
         }
     }
 
+    #[allow(dead_code)]
     fn coalesce(&mut self) {
         unsafe {
             let mut head = self.get_head();
@@ -380,28 +375,29 @@ pub fn init() {
     ByteGrainAllocator::init();
 }
 
+// Allocate kernel memory pages
 pub fn alloc_pages(pages: usize) -> *mut u8 {
     unsafe { PAGE_GRAIN_ALLOC.alloc(pages) }
 }
 
+// Allocate zeroed kernel memory pages
 pub fn alloc_pages_zeroed(pages: usize) -> *mut u8 {
     unsafe { PAGE_GRAIN_ALLOC.zalloc(pages) }
 }
 
+// Allocate zeroed bytes from kernel byte allocator
 pub fn alloc_bytes_zeroed(sz: usize) -> *mut u8 {
     unsafe { BYTE_GRAIN_ALLOC.kzmalloc(sz) }
 }
 
+// Allocate bytes from kernel byte allocator
 pub fn alloc_bytes(sz: usize) -> *mut u8 {
     unsafe { BYTE_GRAIN_ALLOC.kmalloc(sz) }
 }
 
+// Free bytes from kernel byte allocator
 pub fn free_bytes(ptr: *mut u8) {
     unsafe { BYTE_GRAIN_ALLOC.kfree(ptr) };
-}
-
-pub fn coalesce_bytes() {
-    unsafe { BYTE_GRAIN_ALLOC.coalesce() };
 }
 
 // Helpful debugging aid to visualize kernel memory heap

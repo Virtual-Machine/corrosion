@@ -1,7 +1,6 @@
-use crate::print;
-use crate::println;
 use crate::uart::serial_info;
 use crate::virtio;
+use crate::{print, println};
 
 // mod plic.rs
 // This is a very simple PLIC driver that enables 8 PLIC interrupts

@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 "debug-full" = []
 "test-suite" = []
+"test-block-write" = []
 
 [profile.dev]
 opt-level = 0
