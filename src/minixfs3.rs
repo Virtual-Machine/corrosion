@@ -144,7 +144,7 @@ impl MinixFileSystem {
         None
     }
 
-    fn cache_tree(btm: &mut BTreeMap<String, Inode>, cwd: &String, inode_num: u32) {
+    fn cache_tree(btm: &mut BTreeMap<String, Inode>, cwd: &str, inode_num: u32) {
         let ino = Self::get_inode(inode_num).unwrap();
         let mut buf = Buffer::new(((ino.size + BLOCK_SIZE - 1) & !BLOCK_SIZE) as usize);
         let dirents = buf.get() as *const DirEntry;

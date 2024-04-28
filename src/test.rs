@@ -1,7 +1,6 @@
 use crate::alloc;
 use crate::assembly;
 use crate::block;
-#[allow(dead_code)]
 use crate::debug;
 use crate::minixfs3::MinixFileSystem;
 use crate::uart::{serial_step, serial_test, serial_test_passed};
