@@ -1,6 +1,6 @@
 # Corrosion
 
-[https://img.shields.io/badge/version-0.2.0-blue]
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 
 ## CorrOSion is an OS
 
