@@ -2,7 +2,7 @@
 // A module centralizing all project configuration
 
 // Main Configuration
-pub const VERSION: &str = "v0.1.0";
+pub const VERSION: &str = "v0.2.0";
 pub const PLATFORM: &str = "RISCV-64 QEMU Virt";
 pub const PAGE_SIZE: usize = 0x1000;
 pub const BANNER: &str = "
