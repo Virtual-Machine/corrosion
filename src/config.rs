@@ -14,7 +14,6 @@ pub const BANNER: &str = "
  \\___\\___/|_|  |_|  \x1b[38;5;202m\\___/|___/\x1b[39m_|\\___/|_| |_|
 ============================================\n";
 
-pub const WAIT_FOR_READY: usize = 5000; // Spin wait for block
 
 // Colour Print Labels
 pub const MAIN: &str = "[\x1b[38;5;214mMAIN\x1b[39m]";

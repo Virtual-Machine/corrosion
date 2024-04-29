@@ -1,6 +1,6 @@
 use crate::alloc::{alloc_bytes, alloc_pages_zeroed, free_bytes};
 use crate::assembly;
-use crate::config::{PAGE_SIZE, WAIT_FOR_READY};
+use crate::config::PAGE_SIZE;
 use crate::uart::serial_info;
 use crate::{print, println};
 use core::mem::size_of;
@@ -212,7 +212,7 @@ impl BlockDevice {
             let idx = self.ack_used_idx as usize % VIRTIO_RING_SIZE;
             let elem = &queue.used.ring[idx];
             self.ack_used_idx = self.ack_used_idx.wrapping_add(1);
-            self.ready[idx] = true;
+            self.ready.as_mut_ptr().add(idx).write_volatile(true);
             let rq = queue.desc[elem.id as usize].addr as *const Request;
             free_bytes(rq as *mut u8);
         }
@@ -270,7 +270,7 @@ impl BlockDevice {
         let idx = (*self.queue).avail.idx as usize % VIRTIO_RING_SIZE;
         (*self.queue).avail.ring[idx] = head_idx;
         (*self.queue).avail.idx = (*self.queue).avail.idx.wrapping_add(1);
-        self.ready[idx] = false;
+        self.ready.as_mut_ptr().add(idx).write_volatile(false);
         self.dev.add(MMIO_QUEUE_NOTIFY).write_volatile(0);
         idx
     }
@@ -284,10 +284,8 @@ impl BlockDevice {
         self.block_data(buffer, size, write);
         self.block_status(blk_request);
         let idx = self.block_notify(head_idx);
-        let mut counter = 0;
-        while counter < WAIT_FOR_READY && !self.ready[idx] {
+        while !self.ready.as_ptr().add(idx).read_volatile() {
             assembly::no_operation();
-            counter += 1;
         }
     }
 
