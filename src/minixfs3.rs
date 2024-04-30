@@ -131,7 +131,7 @@ impl DirEntry {
 }
 
 static mut MFS_INODE_CACHE: BTreeMap<String, Inode> = BTreeMap::new();
-static mut SUPERBLOCK: SuperBlock = SuperBlock {
+static mut MFS_SUPERBLOCK_CACHE: SuperBlock = SuperBlock {
     ninodes: 0,
     pad0: 0,
     imap_blocks: 0,
@@ -213,7 +213,7 @@ impl ReadState {
 pub struct MinixFileSystem;
 impl MinixFileSystem {
     pub fn get_inode(inode_num: u32) -> Option<Inode> {
-        unsafe { SUPERBLOCK.get_inode(inode_num) }
+        unsafe { MFS_SUPERBLOCK_CACHE.get_inode(inode_num) }
     }
 
     fn cache_tree(btm: &mut BTreeMap<String, Inode>, cwd: &str, inode_num: u32) {
@@ -235,7 +235,7 @@ impl MinixFileSystem {
         let mut buffer = Buffer::new(SECTOR_SIZE);
         let super_block = unsafe { &*(buffer.get_mut() as *mut SuperBlock) };
         block::read(buffer.get_mut(), SECTOR_SIZE as u32, BLOCK_SIZE as u64);
-        unsafe { SUPERBLOCK = *super_block };
+        unsafe { MFS_SUPERBLOCK_CACHE = *super_block };
     }
 
     fn init_inode_cache() {
