@@ -14,7 +14,6 @@ pub const BANNER: &str = "
  \\___\\___/|_|  |_|  \x1b[38;5;202m\\___/|___/\x1b[39m_|\\___/|_| |_|
 ============================================\n";
 
-
 // Colour Print Labels
 pub const MAIN: &str = "[\x1b[38;5;214mMAIN\x1b[39m]";
 pub const STEP: &str = "[\x1b[38;5;130mSTEP\x1b[39m]";

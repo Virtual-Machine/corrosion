@@ -18,9 +18,9 @@ const DIRECT_ZONES: usize = 7;
 const INDIRECT_ZONE: usize = 7;
 const DOUBLE_INDIRECT_ZONE: usize = 8;
 const TRIPLE_INDIRECT_ZONE: usize = 9;
-// const S_IFREG: u16 = 0o100_000;
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct SuperBlock {
     pub ninodes: u32,
     pub pad0: u16,
@@ -37,6 +37,44 @@ pub struct SuperBlock {
     pub disk_version: u8,
 }
 
+impl SuperBlock {
+    fn is_minixfs(&self) -> bool {
+        self.magic == MAGIC
+    }
+
+    fn blocks_first_four_areas(&self) -> usize {
+        (2 + self.imap_blocks + self.zmap_blocks) as usize
+    }
+
+    fn inode_offset(&self, inode_num: u32) -> usize {
+        (inode_num as usize - 1) / (BLOCK_SIZE as usize / size_of::<Inode>())
+    }
+
+    fn inode_index(&self, inode_num: u32) -> usize {
+        (inode_num as usize - 1) % (BLOCK_SIZE as usize / size_of::<Inode>())
+    }
+
+    fn inode_offset_and_index(&self, inode_num: u32) -> (usize, usize) {
+        let offset = self.blocks_first_four_areas() * BLOCK_SIZE as usize
+            + self.inode_offset(inode_num) * BLOCK_SIZE as usize;
+        let index = self.inode_index(inode_num);
+        (offset, index)
+    }
+
+    fn get_inode(&self, inode_num: u32) -> Option<Inode> {
+        if self.is_minixfs() {
+            let (inode_offset, inode_index) = self.inode_offset_and_index(inode_num);
+            let mut inode_buffer = Buffer::default();
+            let inode_ptr = inode_buffer.get_mut() as *mut Inode;
+            block::read(inode_buffer.get_mut(), BLOCK_SIZE, inode_offset as u64);
+            unsafe { Some(*(inode_ptr.add(inode_index))) }
+        } else {
+            println!("WARNING: Couldn't read superblock as expected");
+            None
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Inode {
@@ -51,13 +89,63 @@ pub struct Inode {
     pub zones: [u32; 10],
 }
 
+impl Inode {
+    fn get_dirents(&self) -> (*const DirEntry, usize) {
+        let mut buf = Buffer::new(((self.size + BLOCK_SIZE - 1) & !BLOCK_SIZE) as usize);
+        let dirents = buf.get() as *const DirEntry;
+        let sz = MinixFileSystem::read(self, buf.get_mut(), BLOCK_SIZE, 0);
+        let num_dirents = sz as usize / size_of::<DirEntry>();
+        (dirents, num_dirents)
+    }
+
+    fn is_directory(&self) -> bool {
+        self.mode & S_IFDIR != 0
+    }
+}
+
 #[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct DirEntry {
     pub inode: u32,
     pub name: [u8; 60],
 }
 
+impl DirEntry {
+    fn abs_name(&self, cwd: &str, inode_num: u32) -> String {
+        let mut new_cwd = String::with_capacity(120);
+        for i in cwd.bytes() {
+            new_cwd.push(i as char);
+        }
+        if inode_num != 1 {
+            new_cwd.push('/');
+        }
+        for i in 0..FILE_NAME_SIZE {
+            if self.name[i] == 0 {
+                break;
+            }
+            new_cwd.push(self.name[i] as char);
+        }
+        new_cwd.shrink_to_fit();
+        new_cwd
+    }
+}
+
 static mut MFS_INODE_CACHE: BTreeMap<String, Inode> = BTreeMap::new();
+static mut SUPERBLOCK: SuperBlock = SuperBlock {
+    ninodes: 0,
+    pad0: 0,
+    imap_blocks: 0,
+    zmap_blocks: 0,
+    first_data_zone: 0,
+    log_zone_size: 0,
+    pad1: 0,
+    max_size: 0,
+    zones: 0,
+    magic: 0,
+    pad2: 0,
+    block_size: 0,
+    disk_version: 0,
+};
 
 struct ReadState {
     offset_byte: u32,
@@ -125,66 +213,42 @@ impl ReadState {
 pub struct MinixFileSystem;
 impl MinixFileSystem {
     pub fn get_inode(inode_num: u32) -> Option<Inode> {
-        let mut buffer = Buffer::new(SECTOR_SIZE);
-        let super_block = unsafe { &*(buffer.get_mut() as *mut SuperBlock) };
-        block::read(buffer.get_mut(), SECTOR_SIZE as u32, BLOCK_SIZE as u64);
-        if super_block.magic == MAGIC {
-            let inode_offset = (2 + super_block.imap_blocks + super_block.zmap_blocks) as usize
-                * BLOCK_SIZE as usize
-                + ((inode_num as usize - 1) / (BLOCK_SIZE as usize / size_of::<Inode>()))
-                    * BLOCK_SIZE as usize;
-            let mut buffer2 = Buffer::default();
-            let inode = buffer2.get_mut() as *mut Inode;
-            block::read(buffer2.get_mut(), BLOCK_SIZE, inode_offset as u64);
-            let inode_index = (inode_num as usize - 1) % (BLOCK_SIZE as usize / size_of::<Inode>());
-            return unsafe { Some(*(inode.add(inode_index))) };
-        } else {
-            println!("WARNING: Couldn't read superblock as expected")
-        }
-        None
+        unsafe { SUPERBLOCK.get_inode(inode_num) }
     }
 
     fn cache_tree(btm: &mut BTreeMap<String, Inode>, cwd: &str, inode_num: u32) {
-        let ino = Self::get_inode(inode_num).unwrap();
-        let mut buf = Buffer::new(((ino.size + BLOCK_SIZE - 1) & !BLOCK_SIZE) as usize);
-        let dirents = buf.get() as *const DirEntry;
-        let sz = Self::read(&ino, buf.get_mut(), BLOCK_SIZE, 0);
-        let num_dirents = sz as usize / size_of::<DirEntry>();
+        let inode = Self::get_inode(inode_num).expect("To be passed a valid inode_num");
+        let (dirents, num_dirents) = inode.get_dirents();
         for i in DIR_ENTRY_START..num_dirents {
-            unsafe {
-                let d = &(*dirents.add(i));
-                let d_ino = Self::get_inode(d.inode).unwrap();
-                let mut new_cwd = String::with_capacity(120);
-                for i in cwd.bytes() {
-                    new_cwd.push(i as char);
-                }
-                if inode_num != 1 {
-                    new_cwd.push('/');
-                }
-                for i in 0..FILE_NAME_SIZE {
-                    if d.name[i] == 0 {
-                        break;
-                    }
-                    new_cwd.push(d.name[i] as char);
-                }
-                new_cwd.shrink_to_fit();
-                if d_ino.mode & S_IFDIR != 0 {
-                    Self::cache_tree(btm, &new_cwd, d.inode);
-                } else {
-                    btm.insert(new_cwd, d_ino);
-                }
+            let directory_entry = &(unsafe { *dirents.add(i) });
+            let directory_entry_inode = Self::get_inode(directory_entry.inode).unwrap();
+            let new_cwd = directory_entry.abs_name(cwd, inode_num);
+            if directory_entry_inode.is_directory() {
+                Self::cache_tree(btm, &new_cwd, directory_entry.inode);
+            } else {
+                btm.insert(new_cwd, directory_entry_inode);
             }
         }
     }
 
-    pub fn init() {
+    fn init_superblock_cache() {
+        let mut buffer = Buffer::new(SECTOR_SIZE);
+        let super_block = unsafe { &*(buffer.get_mut() as *mut SuperBlock) };
+        block::read(buffer.get_mut(), SECTOR_SIZE as u32, BLOCK_SIZE as u64);
+        unsafe { SUPERBLOCK = *super_block };
+    }
+
+    fn init_inode_cache() {
         let mut btm = BTreeMap::new();
         let cwd = String::from("/");
 
         Self::cache_tree(&mut btm, &cwd, ROOT_NODE);
-        unsafe {
-            MFS_INODE_CACHE = btm;
-        }
+        unsafe { MFS_INODE_CACHE = btm };
+    }
+
+    pub fn init() {
+        Self::init_superblock_cache();
+        Self::init_inode_cache();
     }
 
     fn read_data(buffer: *mut u8, rs: &mut ReadState) {
@@ -343,6 +407,15 @@ impl MinixFileSystem {
         }
 
         rs.bytes_read
+    }
+
+    pub fn read_file(file_name: &str, buffer: *mut u8, size: u32, offset: u32) -> u32 {
+        if let Some(node) = unsafe { MFS_INODE_CACHE.get(file_name) } {
+            Self::read(node, buffer, size, offset)
+        } else {
+            println!("Unable to find '{}' in MFS_INODE_CACHE", file_name);
+            0
+        }
     }
 
     #[allow(dead_code)]

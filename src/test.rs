@@ -19,6 +19,7 @@ pub fn run() {
     test_block_device_write();
     test_minixfs3_stress();
     test_minixfs3_read();
+    test_minixfs3_read_file();
 }
 
 #[allow(dead_code)]
@@ -111,6 +112,31 @@ fn test_minixfs3_read() {
         }
     } else {
         println!("Unable to find node 2");
+    }
+    alloc::free_bytes(buffer);
+}
+
+#[allow(dead_code)]
+fn test_minixfs3_read_file() {
+    const FILE_SIZE: u32 = 3;
+    serial_test("minix3 fs driver read file...");
+    let buffer = alloc::alloc_bytes(100);
+
+    let bytes_read = MinixFileSystem::read_file("/hello.txt", buffer, 100, 0);
+    if bytes_read != FILE_SIZE {
+        for i in 0..100 {
+            print!("{}", unsafe { buffer.add(i).read() } as char);
+        }
+        println!(
+            "Read {} bytes, but I thought the file was 3 bytes.",
+            bytes_read
+        );
+    } else {
+        unsafe {
+            assert!(buffer.add(0).read() == b'h');
+            assert!(buffer.add(1).read() == b'i');
+        }
+        serial_test_passed();
     }
     alloc::free_bytes(buffer);
 }
