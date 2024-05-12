@@ -42,6 +42,23 @@ impl Buffer {
         }
         println!();
     }
+
+    #[allow(dead_code)]
+    pub fn print_hex(&self) {
+        println!("len: {}", self.len);
+        for i in 0..self.len {
+            print!("{:02x} ", unsafe { self.buffer.add(i).read() });
+        }
+        println!();
+    }
+    #[allow(dead_code)]
+    pub fn print_binary(&self) {
+        println!("len: {}", self.len);
+        for i in 0..self.len {
+            print!("{:08b} ", unsafe { self.buffer.add(i).read() });
+        }
+        println!();
+    }
 }
 
 impl Default for Buffer {

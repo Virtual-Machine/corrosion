@@ -80,16 +80,25 @@ extern "C" fn kernel_init() {
     alloc::init(); // Kernel Memory Allocator
     plic::init(); // Platform level interrupt controller
     virtio::init(); // Virtio driver
-    #[cfg(feature = "debug-full")]
-    debug::fs_cache();
 }
 
 #[no_mangle]
 // Interrupts are enabled here...
 extern "C" fn kernel_main() {
     minixfs3::init(); // Initialize fs cache
+    
     #[cfg(feature = "test-suite")]
     test::run();
 
-    serial_step("Booted successfully!\n")
+    #[cfg(feature = "debug-full")]{
+        debug::heap();
+        debug::fs_cache();
+        debug::fs();
+    }
+    serial_step("Booted successfully!\n");
+    shutdown();
+}
+
+fn shutdown(){
+    assembly::trigger_shutdown();
 }

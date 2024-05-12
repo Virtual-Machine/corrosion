@@ -57,8 +57,6 @@ fn test_block_device_read() {
     serial_test("block driver read...");
     let buffer = alloc::alloc_bytes(512);
     block::read(buffer, 512, 512 * 2);
-    #[cfg(feature = "debug-full")]
-    debug::heap();
     unsafe {
         assert!(buffer.add(0).read() == 0xb0);
         assert!(buffer.add(1).read() == 0x2a);

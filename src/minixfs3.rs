@@ -434,3 +434,132 @@ pub fn debug_cache() {
         println!("{}: {:?}", strg, node);
     }
 }
+
+fn bit_count(byte: u8) -> u32 {
+    match byte {
+        0 => 0,
+        1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 => 1,
+        3 | 5 | 6 | 9 | 10 | 12 | 17 | 18 | 20 | 24 | 33 | 34 | 36 | 40 | 48 | 65 | 66 | 68 | 72 | 80 | 96 | 129 | 130 | 132 | 136 | 144 | 160 | 192 => 2,
+        7 | 11 | 13 | 14 | 19 | 21 | 22 | 25 | 26 | 28 | 35 | 37 | 38 | 41 | 42 | 44 | 49 | 50 | 52 | 56 | 67 | 69 | 70 | 73 | 74 | 76 | 81 | 82 | 84 | 88 | 97 | 98 | 100 | 104 | 112 | 131 | 133 | 134 | 137 | 138 | 140 | 145 | 146 | 148 | 152 | 161 | 162 | 164 | 168 | 176 | 193 | 194 | 196 | 200 | 208 | 224 => 3,
+        15 | 23 | 27 | 29 | 30 | 39 | 43 | 45 | 46 | 51 | 53 | 54 | 57 | 58 | 60 | 71 | 75 | 77 | 78 | 83 | 85 | 86 | 89 | 90 | 92 | 99 | 101 | 102 | 105 | 106 | 108 | 113 | 114 | 116 | 120 | 135 | 139 | 141 | 142 | 147 | 149 | 150 | 153 | 154 | 156 | 163 | 165 | 166 | 169 | 170 | 172 | 177 | 178 | 180 | 184 | 195 | 197 | 198 | 201 | 202 | 204 | 209 | 210 | 212 | 216 | 225 | 226 | 228 | 232 | 240 => 4,
+        31 | 47 | 55 | 59 | 61 | 62 | 79 | 87 | 91 | 93 | 94 | 103 | 107 | 109 | 110 | 115 | 117 | 118 | 121 | 122 | 124 | 143 | 151 | 155 | 157 | 158 | 167 | 171 | 173 | 174 | 179 | 181 | 182 | 185 | 186 | 188 | 199 | 203 | 205 | 206 | 211 | 213 | 214 | 217 | 218 | 220 | 227 | 229 | 230 | 233 | 234 | 236 | 241 | 242 | 244 | 248 => 5,
+        63 | 95 | 111 | 119 | 123 | 125 | 126 | 159 | 175 | 183 | 187 | 189 | 190 | 207 | 215 | 219 | 221 | 222 | 231 | 235 | 237 | 238 | 243 | 245 | 246 | 249 | 250 | 252 => 6,
+        127 | 191 | 223 | 239 | 247 | 251 | 253 | 254 => 7,
+        255 => 8,
+    }
+}
+
+fn print_bitmap(read_size: u32, offset: u64, items: u32) -> u32 {
+    let mut buffer = Buffer::new(read_size as usize);
+    block::read(buffer.get_mut(), read_size, offset);
+    let mut previous_print = true;
+    let mut total_bit_count = 0;
+    for i in 0..items {
+        let val = unsafe { buffer.get().add(i as usize).read()};
+        total_bit_count += bit_count(val);
+        // Print first, last, and non 0 bytes
+        if i == 0 || i == items - 1 || val != 0x0 {
+            print!("{:08b} ", val);
+            previous_print = true;
+        } else {
+            if previous_print {
+                // If the previous byte was printed show ellipsis 
+                // to indicate a skipped range of byte(s)
+                print!("........ ");
+                previous_print = false;
+            }
+        }
+    };
+    total_bit_count
+}
+
+fn find_first_free_inode() {
+    let read_size = BLOCK_SIZE * unsafe{MFS_SUPERBLOCK_CACHE}.imap_blocks as u32;
+    let offset = (BLOCK_SIZE * 2) as u64;
+    let mut buffer = Buffer::new(read_size as usize);
+    block::read(buffer.get_mut(), read_size, offset);
+    for byte_idx in 0..unsafe{MFS_SUPERBLOCK_CACHE}.ninodes/8 {
+        let byte = unsafe { buffer.get().add(byte_idx as usize).read()};
+        if byte != 0xff {
+            for bit_idx in 0..8 {
+                if (byte & (1 << bit_idx)) == 0 {
+                    let inode_idx = (byte_idx * 8 + bit_idx) as u32;
+                    println!("First available inode: {}", (inode_idx + 1));
+                    return;
+                }
+            }
+        }
+    }
+    println!("No available inode found!");
+}
+
+fn find_first_free_zone() {
+    let read_size = BLOCK_SIZE * unsafe{MFS_SUPERBLOCK_CACHE}.zmap_blocks as u32;
+    let offset = (BLOCK_SIZE * (2 + unsafe{MFS_SUPERBLOCK_CACHE}.imap_blocks as u32)) as u64;
+    let mut buffer = Buffer::new(read_size as usize);
+    block::read(buffer.get_mut(), read_size, offset);
+    for byte_idx in 0..unsafe{MFS_SUPERBLOCK_CACHE}.zones/8 {
+        let byte = unsafe { buffer.get().add(byte_idx as usize).read()};
+        if byte != 0xff {
+            for bit_idx in 0..8 {
+                if (byte & (1 << bit_idx)) == 0 {
+                    let inode_idx = (byte_idx * 8 + bit_idx) as u32;
+                    println!("First available zone: {}", (inode_idx + 1));
+                    return;
+                }
+            }
+        }
+    }
+    println!("No available zone found!");
+}
+
+pub fn debug_fs() {
+    let superblock_cache = unsafe{MFS_SUPERBLOCK_CACHE};
+    serial_debug("FS");
+    println!("SuperBlock:");
+    println!("  # of inodes    : {}", superblock_cache.ninodes);
+    println!("  padding 0      : {}", superblock_cache.pad0);
+    println!("  inode blocks   : {}", superblock_cache.imap_blocks);
+    println!("  zone blocks    : {}", superblock_cache.zmap_blocks);
+    println!("  first data zone: {}", superblock_cache.first_data_zone);
+    println!("  log zone size  : {}", superblock_cache.log_zone_size);
+    println!("  padding 1      : {}", superblock_cache.pad1);
+    println!("  max size       : {}", superblock_cache.max_size);
+    println!("  zones          : {}", superblock_cache.zones);
+    println!("  magic          : {}", superblock_cache.magic);
+    println!("  padding 2      : {}", superblock_cache.pad2);
+    println!("  block size     : {}", superblock_cache.block_size);
+    println!("  disk version   : {}", superblock_cache.disk_version);
+
+    let inodes = superblock_cache.ninodes;
+    let zones = superblock_cache.zones;
+    let imap_blocks = superblock_cache.imap_blocks as u32;
+    let zmap_blocks = superblock_cache.zmap_blocks as u32;
+    let first_data_zone = superblock_cache.first_data_zone as u32;
+
+    println!("\nInode Bitmap:");
+    let read_size = BLOCK_SIZE * imap_blocks;
+    let offset = (BLOCK_SIZE * 2) as u64;
+    let count = print_bitmap(read_size, offset, inodes/8);
+    println!("\n  Used {} / {} inodes ({}%)", count, inodes, count * 100 / inodes);
+
+    find_first_free_inode();
+
+    println!("\nZone Bitmap:");
+    let read_size = BLOCK_SIZE * zmap_blocks;
+    let offset = (BLOCK_SIZE * (2 + imap_blocks)) as u64;
+    let count = print_bitmap(read_size, offset, zones/8 - first_data_zone);    
+    println!("\n  Used {} / {} zones ({}%)", count, zones, count * 100 / zones);
+
+    find_first_free_zone();
+
+    // Print the inode representing the root directory
+    if let Some(node) = superblock_cache.get_inode(1){
+        println!("{:?}", node);
+    }
+
+    // Print the test file inside the root directory
+    if let Some(node) = superblock_cache.get_inode(2){
+        println!("{:?}", node);
+    }
+}

@@ -42,3 +42,10 @@ pub fn trigger_illegal_store() {
         asm!("li a0, 1", "li a1, 1", "sw a1, 1(a0)");
     }
 }
+
+// Used to trigger a shutdown in the qemu virt platform
+pub fn trigger_shutdown() {
+    unsafe {
+        asm!("li a0, 0x100000", "li a1, 0x5555", "sw a1, 0(a0)");
+    }
+}

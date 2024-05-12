@@ -15,6 +15,11 @@ pub fn fs_cache() {
 }
 
 #[allow(dead_code)]
+pub fn fs() {
+    minixfs3::debug_fs();
+}
+
+#[allow(dead_code)]
 pub fn dbg(text: &str) {
     uart::serial_debug(text);
 }
